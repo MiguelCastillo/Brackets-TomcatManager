@@ -1,0 +1,29 @@
+.tomcatManager {
+}
+
+.tomcatManager * {
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+.tomcatManager .resizable-content {
+    padding-top: 24px;
+    position: relative;
+}
+
+.tomcatManager .actionsContainer {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+}
+
+.tomcatManager .consoleContainer {
+    height: 100%;
+    overflow: auto;
+}
+
+.tomcatManager .table {
+    /* reset bottom margin... I want to take all available space */
+    margin-bottom: 0px !important;
+}

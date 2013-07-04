@@ -28,10 +28,23 @@ define(function (require, exports, module) {
 
     var AppInit         = brackets.getModule("utils/AppInit"),
         CommandManager  = brackets.getModule("command/CommandManager"),
-        Menus           = brackets.getModule("command/Menus");
+        ExtensionUtils  = brackets.getModule("utils/ExtensionUtils"),
+        Menus           = brackets.getModule("command/Menus"),
+        PanelManager    = brackets.getModule("view/PanelManager"),
+        Resizer         = brackets.getModule("utils/Resizer");
 
-    var tomcat          = require("Tomcat"),
-        configurations  = require("ConfigurationManager");
+    var tomcat           = require("Tomcat"),
+        configurations   = require("ConfigurationManager");
+
+    var tmpl = {
+        tomcatManager: require("text!tmpl/tomcatManager.html"),
+        console: require("text!tmpl/console.html"),
+        consoleMessage: require("text!tmpl/consoleMessage.html"),
+        actions: require("text!tmpl/actions.html")
+    };
+
+    var $tomcatManager = false;
+
 
     // Look for the menu where we will be inserting our theme menu
     var menu = Menus.addMenu("Tomcat", "tomcatManager", Menus.BEFORE, Menus.AppMenuBar.HELP_MENU);
@@ -49,6 +62,10 @@ define(function (require, exports, module) {
     };
 
 
+    // Load styling
+    ExtensionUtils.loadStyleSheet(module, "tmpl/tomcatManager.css");
+
+
     for ( var iCmd in commands ) {
         if ( commands.hasOwnProperty(iCmd) === false ) {
             continue;
@@ -60,6 +77,67 @@ define(function (require, exports, module) {
     }
 
     menu.addMenuDivider();
+
+
+
+    function setCurrentServer(server) {
+        var $console = $(tmpl.console).appendTo($tomcatManager.find(".consoleContainer").empty());
+        var $actions = $(tmpl.actions).appendTo($tomcatManager.find(".actionsContainer").empty());
+        var _instance = false;
+
+        $actions.on("click", ".start", function(evt) {
+            tomcat.start(server).done(instanceManager);
+        })
+        .on("click", ".stop", function(evt) {
+            tomcat.stop(_instance);
+        })
+        .on("click", ".clear", function(evt) {
+            $console.find(".messages").empty();
+        });
+
+
+        function instanceManager(instance) {
+            _instance = instance;
+
+            $(instance).on("tomcat.started", function(evt, success, message) {
+                //console.log("tomcat.start", success, message);
+            });
+
+            $(instance).on("tomcat.stopped", function(evt, success, message) {
+                //console.log("tomcat.stopped", success, message);
+            });
+
+            $(instance).on("tomcat.message", function(evt, message) {
+                var messageHtml = Mustache.render(tmpl.consoleMessage, message);
+                $console.find(".messages").append($(messageHtml));
+            });
+        }
+    }
+
+
+    function unregisterServer(server) {
+        menu.removeMenuItem(server.name);
+        //CommandManager.get(config.id);
+    }
+
+
+    function registerServer(server) {
+        // Register tomcat items as menu items so that clicking on one
+        // of them can trigger starting it up and opening up the console
+        // for it.
+        CommandManager.register(server.name, server.name, function() {
+            if ( !this.getChecked() ) {
+                this.setChecked(true);
+                toggle(true);
+                setCurrentServer(server);
+            }
+            else {
+                this.setChecked(false);
+            }
+        });
+
+        menu.addMenuItem(server.name);
+    }
 
 
     configurations.ready(function() {
@@ -75,41 +153,38 @@ define(function (require, exports, module) {
             }
         }
 
-
-        function unregister(server) {
-            menu.removeMenuItem(server.name);
-            //CommandManager.get(config.id);
-        }
-
-
-        function register(server) {
-            CommandManager.register(server.name, server.name, function() {
-                if ( !this.getChecked() ) {
-                    tomcat.start(server);
-                    this.setChecked(true);
-                }
-                else {
-                    tomcat.stop(server);
-                    this.setChecked(false);
-                }
-            });
-
-            menu.addMenuItem(server.name);
-        }
-
-
         $(configurations).on("load", function(event, configs) {
-            iterate(configs, register);
+            iterate(configs, registerServer);
         });
 
-
         $(configurations).on("unload", function(event, configs) {
-            iterate(configs, unregister);
+            iterate(configs, unregisterServer);
         });
     });
 
 
-    AppInit.appReady(function () {
+    function toggle(open) {
+        if ( open === undefined ) {
+            open = !$tomcatManager.addClass("open");
+        }
+
+        if ( open === true ) {
+            $tomcatManager.addClass("open");
+            Resizer.show($tomcatManager);
+        }
+        else {
+            $tomcatManager.removeClass("open");
+            Resizer.hide($tomcatManager);
+        }
+    }
+
+
+    AppInit.htmlReady(function () {
+        PanelManager.createBottomPanel("tomcat.results", $(tmpl.tomcatManager), 100);
+        $tomcatManager = $("#tomcatManager");
+        $tomcatManager.on("click", ".close", function (evt) {
+            toggle();
+        });
     });
 
 });

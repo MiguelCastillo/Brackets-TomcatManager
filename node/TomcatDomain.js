@@ -83,18 +83,18 @@
 
         child.stderr.on("data", function(data) {
             var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [message]);
+            _domainManager.emitEvent("tomcat", "message", [child.pid, message]);
 
             if ( starting ) {
                 if ( message.type === "INFO" && message.text.indexOf("Server startup in") === 0 ) {
                     // trigger startup succesfull
                     starting = false;
-                    _domainManager.emitEvent("tomcat", "started", [child.pid, message]);
+                    _domainManager.emitEvent("tomcat", "started", [child.pid, true, message]);
                 }
                 else if ( message.type === "SEVERE" ) {
                     // trigger a failure
                     starting = false;
-                    _domainManager.emitEvent("tomcat", "started", [0, message]);
+                    _domainManager.emitEvent("tomcat", "started", [child.pid, false, message]);
                 }
             }
         });
@@ -103,16 +103,12 @@
             // Not sure why stdout isn't getting any of the startup messages
             // that aren't errors...
             var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [message]);
+            _domainManager.emitEvent("tomcat", "message", [child.pid, message]);
         });
 
-        child.on("error", function(data) {
-            //console.log("error", data);
-        });
-
-        child.on("close", function(code){
-            //console.log("exit code: " + code);
-        });
+        return {
+            pid: child.pid
+        };
     }
 
 
@@ -120,27 +116,19 @@
     * @private
     * Stops the currently running tomcat instance
     */
-    function cmdStop( settings ) {
+    function cmdStop( instance ) {
         var child;
 
-        child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: settings.AppServer.path, env: process.env});
+        child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: instance.settings.AppServer.path, env: process.env});
 
         child.stderr.on("data", function(data) {
             var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [true, message]);
+            _domainManager.emitEvent("tomcat", "message", [instance.pid, true, message]);
         });
 
         child.stdout.on("data", function(data) {
             var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [message]);
-        });
-
-        child.on("error", function(data) {
-            //console.log("error", data);
-        });
-
-        child.on("close", function(code){
-            //console.log("exit code: " + code);
+            _domainManager.emitEvent("tomcat", "message", [instance.pid, true, message]);
         });
     }
 

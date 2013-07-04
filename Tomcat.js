@@ -28,38 +28,43 @@ define(function(require, exports, module) {
     var ExtensionUtils  = brackets.getModule("utils/ExtensionUtils"),
         NodeConnection  = brackets.getModule("utils/NodeConnection");
 
-    var _connection = null, id = 0;
+    var _connection = null, instances = {};
 
     function init(connection) {
         _connection = connection;
 
-        $(_connection).on("tomcat.started", function (evt, success, data) {
-            console.log("started", success, data);
+        $(_connection).on("tomcat.started", function (evt, pid, success, data) {
+            $(instances[pid]).trigger("tomcat.started", [success, data]);
         });
 
-        $(_connection).on("tomcat.stopped", function (evt, success, data) {
-            console.log("stopped", success, data);
+        $(_connection).on("tomcat.stopped", function (evt, pid, success, data) {
+            $(instances[pid]).trigger("tomcat.stopped", [success, data]);
         });
 
-        $(_connection).on("tomcat.message", function (evt, data) {
-            console.log("message", data);
+        $(_connection).on("tomcat.message", function (evt, pid, data) {
+            //console.log("Message", pid, data);
+            $(instances[pid]).trigger("tomcat.message", [data]);
         });
     }
 
 
     function start( settings ) {
-        _connection.domains.tomcat.start( settings, id )
-            .done(function (result) {
-                console.log(result);
-            })
-            .fail(function (err) {
-                console.error(err);
-            });
+        function success(result) {
+            var instance = {
+                pid: result.pid,
+                settings: settings
+            };
+
+            instances[result.pid] = instance;
+            return instance;
+        }
+
+        return _connection.domains.tomcat.start(settings).then(success, success);
     }
 
 
-    function stop( settings ) {
-        _connection.domains.tomcat.stop( settings )
+    function stop( instance ) {
+        _connection.domains.tomcat.stop( instance )
             .done(function (result) {
                 console.log(result);
             })
