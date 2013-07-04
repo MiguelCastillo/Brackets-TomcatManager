@@ -28,7 +28,7 @@ define(function(require, exports, module) {
     var ExtensionUtils  = brackets.getModule("utils/ExtensionUtils"),
         NodeConnection  = brackets.getModule("utils/NodeConnection");
 
-    var _connection = null;
+    var _connection = null, id = 0;
 
     function init(connection) {
         _connection = connection;
@@ -48,23 +48,23 @@ define(function(require, exports, module) {
 
 
     function start( settings ) {
-        _connection.domains.tomcat.start( settings )
-            .fail(function (err) {
-                console.error(err);
-            })
+        _connection.domains.tomcat.start( settings, id )
             .done(function (result) {
                 console.log(result);
+            })
+            .fail(function (err) {
+                console.error(err);
             });
     }
 
 
     function stop( settings ) {
         _connection.domains.tomcat.stop( settings )
-            .fail(function (err) {
-                console.error(err);
-            })
             .done(function (result) {
                 console.log(result);
+            })
+            .fail(function (err) {
+                console.error(err);
             });
     }
 

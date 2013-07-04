@@ -89,12 +89,12 @@
                 if ( message.type === "INFO" && message.text.indexOf("Server startup in") === 0 ) {
                     // trigger startup succesfull
                     starting = false;
-                    _domainManager.emitEvent("tomcat", "started", [true, message]);
+                    _domainManager.emitEvent("tomcat", "started", [child.pid, message]);
                 }
                 else if ( message.type === "SEVERE" ) {
                     // trigger a failure
                     starting = false;
-                    _domainManager.emitEvent("tomcat", "started", [false, message]);
+                    _domainManager.emitEvent("tomcat", "started", [0, message]);
                 }
             }
         });
