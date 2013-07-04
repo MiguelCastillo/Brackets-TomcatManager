@@ -30,7 +30,8 @@ define(function (require, exports, module) {
         CommandManager  = brackets.getModule("command/CommandManager"),
         Menus           = brackets.getModule("command/Menus");
 
-    var tomcat = require("Tomcat");
+    var tomcat          = require("Tomcat"),
+        configurations  = require("ConfigurationManager");
 
     // Look for the menu where we will be inserting our theme menu
     var menu = Menus.addMenu("Tomcat", "tomcatManager", Menus.BEFORE, Menus.AppMenuBar.HELP_MENU);
@@ -43,24 +44,6 @@ define(function (require, exports, module) {
             exec: function() {
                 // Open dialog to configure tomcat
                 console.log(commands.configure);
-            }
-        },
-        "start": {
-            id: "tomcat.Start",
-            name: "Start",
-            exec: function() {
-                tomcat.start({
-                    tomcat_path: "/Users/shibumidev1/Documents/apache-tomcat-7.0.40/"
-                });
-            }
-        },
-        "stop": {
-            id: "tomcat.Stop",
-            name: "Stop",
-            exec: function() {
-                tomcat.stop({
-                    tomcat_path: "/Users/shibumidev1/Documents/apache-tomcat-7.0.40/"
-                });
             }
         }
     };
@@ -75,6 +58,55 @@ define(function (require, exports, module) {
         CommandManager.register(command.name, command.id, command.exec);
         menu.addMenuItem(command.id);
     }
+
+    menu.addMenuDivider();
+
+
+    configurations.ready(function() {
+        function iterate( config, callback ) {
+            var servers = config.Servers;
+            for ( var iServer in servers ) {
+                if ( servers.hasOwnProperty(iServer) === false ) {
+                    continue;
+                }
+
+                var server = configurations.getServerDetails(iServer);
+                callback(server, config);
+            }
+        }
+
+
+        function unregister(server) {
+            menu.removeMenuItem(server.name);
+            //CommandManager.get(config.id);
+        }
+
+
+        function register(server) {
+            CommandManager.register(server.name, server.name, function() {
+                if ( !this.getChecked() ) {
+                    tomcat.start(server);
+                    this.setChecked(true);
+                }
+                else {
+                    tomcat.stop(server);
+                    this.setChecked(false);
+                }
+            });
+
+            menu.addMenuItem(server.name);
+        }
+
+
+        $(configurations).on("load", function(event, configs) {
+            iterate(configs, register);
+        });
+
+
+        $(configurations).on("unload", function(event, configs) {
+            iterate(configs, unregister);
+        });
+    });
 
 
     AppInit.appReady(function () {

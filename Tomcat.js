@@ -32,6 +32,18 @@ define(function(require, exports, module) {
 
     function init(connection) {
         _connection = connection;
+
+        $(_connection).on("tomcat.started", function (evt, success, data) {
+            console.log("started", success, data);
+        });
+
+        $(_connection).on("tomcat.stopped", function (evt, success, data) {
+            console.log("stopped", success, data);
+        });
+
+        $(_connection).on("tomcat.message", function (evt, data) {
+            console.log("message", data);
+        });
     }
 
 

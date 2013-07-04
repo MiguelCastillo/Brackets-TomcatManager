@@ -29,6 +29,37 @@
     var os = require("os"),
         child_process = require("child_process");
 
+    var _domainManager;
+
+
+    function parseMessage(message) {
+        var lines = ("" + message).split("\n");
+        var length = lines.length;
+
+        if (!length) {
+            return "";
+        }
+
+        var source = lines.shift();
+        var text   = lines.shift();
+
+        var typeOffset = text.indexOf(":");
+        var type       = text.substr(0, typeOffset);
+
+        // Put message together.  The +2 is to skip the : and the extra space in the text.
+        text = text.substr(typeOffset + 2);
+        if ( lines.length ) {
+            text = text + "\n" + lines.join("\n");
+        }
+
+        return {
+            source: source,
+            type: type,
+            text: text
+        };
+    }
+
+
     /**
      * @private
      * Handler function for the simple.getMemory command.
@@ -43,55 +74,73 @@
     /**
     * @private
     * Starts a new tomcat instance with the provided settings
-    * @return Tomcat instance used for shutting it down
     */
     function cmdStart( settings ) {
-        var child;
+        var child, starting = true;
 
-        child = child_process.spawn("sh", ["./bin/catalina.sh", "start"], {cwd: settings.tomcat_path});
+        // Pass in run so that we can capture stdout and stderr messages
+        child = child_process.spawn("sh", ["./bin/catalina.sh", "run"], {cwd: settings.AppServer.path, env: process.env});
 
         child.stderr.on("data", function(data) {
-            console.log("stderr: " + data);
+            var message = parseMessage(data);
+            _domainManager.emitEvent("tomcat", "message", [message]);
+
+            if ( starting ) {
+                if ( message.type === "INFO" && message.text.indexOf("Server startup in") === 0 ) {
+                    // trigger startup succesfull
+                    starting = false;
+                    _domainManager.emitEvent("tomcat", "started", [true, message]);
+                }
+                else if ( message.type === "SEVERE" ) {
+                    // trigger a failure
+                    starting = false;
+                    _domainManager.emitEvent("tomcat", "started", [false, message]);
+                }
+            }
         });
 
         child.stdout.on("data", function(data) {
-            console.log("stdout: " + data);
+            // Not sure why stdout isn't getting any of the startup messages
+            // that aren't errors...
+            var message = parseMessage(data);
+            _domainManager.emitEvent("tomcat", "message", [message]);
         });
 
         child.on("error", function(data) {
-            console.log("error", data);
+            //console.log("error", data);
         });
 
         child.on("close", function(code){
-            console.log("exit code: " + code);
+            //console.log("exit code: " + code);
         });
     }
 
 
     /**
     * @private
-    * Stops a running tomcat instance
-    * @return Object for shutting down the tomcat instance.
+    * Stops the currently running tomcat instance
     */
     function cmdStop( settings ) {
         var child;
 
-        child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: settings.tomcat_path});
+        child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: settings.AppServer.path, env: process.env});
 
         child.stderr.on("data", function(data) {
-            console.log("stderr: " + data);
+            var message = parseMessage(data);
+            _domainManager.emitEvent("tomcat", "message", [true, message]);
         });
 
         child.stdout.on("data", function(data) {
-            console.log("stdout: " + data);
+            var message = parseMessage(data);
+            _domainManager.emitEvent("tomcat", "message", [message]);
         });
 
         child.on("error", function(data) {
-            console.log("error", data);
+            //console.log("error", data);
         });
 
         child.on("close", function(code){
-            console.log("exit code: " + code);
+            //console.log("exit code: " + code);
         });
     }
 
@@ -111,36 +160,54 @@
      * @param {DomainManager} DomainManager The DomainManager for the server
      */
     function init(DomainManager) {
-        if (!DomainManager.hasDomain("tomcat")) {
-            DomainManager.registerDomain("tomcat", {major: 0, minor: 1});
+        _domainManager = DomainManager;
+
+        if (!_domainManager.hasDomain("tomcat")) {
+            _domainManager.registerDomain("tomcat", {major: 0, minor: 1});
         }
 
-        DomainManager.registerCommand(
+        _domainManager.registerCommand(
             "tomcat",       // domain name
             "getMemory",    // command name
             cmdGetMemory,   // command handler function
             false           // this command is synchronous
         );
 
-        DomainManager.registerCommand(
+        _domainManager.registerCommand(
             "tomcat",       // domain name
             "start",        // command name
             cmdStart,       // command handler function
             false           // this command is synchronous
         );
 
-        DomainManager.registerCommand(
+        _domainManager.registerCommand(
             "tomcat",       // domain name
             "stop",         // command name
             cmdStop,        // command handler function
             false           // this command is synchronous
         );
 
-        DomainManager.registerCommand(
+        _domainManager.registerCommand(
             "tomcat",       // domain name
             "getStatus",    // command name
             cmdGetStatus,   // command handler function
             false           // this command is synchronous
+        );
+
+
+        _domainManager.registerEvent(
+            "tomcat",
+            "started"
+        );
+
+        _domainManager.registerEvent(
+            "tomcat",
+            "stopped"
+        );
+
+        _domainManager.registerEvent(
+            "tomcat",
+            "message"
         );
     }
 
