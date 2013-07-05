@@ -39,6 +39,7 @@ define(function(require, exports, module) {
 
         $(_connection).on("tomcat.stopped", function (evt, pid, success, data) {
             $(instances[pid]).trigger("tomcat.stopped", [success, data]);
+            delete instances[pid];
         });
 
         $(_connection).on("tomcat.message", function (evt, pid, data) {
@@ -48,33 +49,27 @@ define(function(require, exports, module) {
     }
 
 
-    function start( settings ) {
+    function start( server ) {
         function success(result) {
             var instance = $.extend({
                 pid: result.pid
-            }, settings);
+            }, server);
 
             instances[result.pid] = instance;
             return instance;
         }
 
-        return _connection.domains.tomcat.start(settings).then(success, success);
+        return _connection.domains.tomcat.start(server).then(success, success);
     }
 
 
     function stop( instance ) {
-        _connection.domains.tomcat.stop( instance )
-            .done(function (result) {
-                console.log(result);
-            })
-            .fail(function (err) {
-                console.error(err);
-            });
+        return _connection.domains.tomcat.stop( instance );
     }
 
 
     function getStatus( instance ) {
-        _connection.domains.tomcat.getStatus( instance )
+        return _connection.domains.tomcat.getStatus( instance )
             .fail(function (err) {
                 console.error(err);
             })

@@ -130,6 +130,8 @@
             var message = parseMessage(data);
             _domainManager.emitEvent("tomcat", "message", [instance.pid, true, message]);
         });
+
+        return true;
     }
 
 

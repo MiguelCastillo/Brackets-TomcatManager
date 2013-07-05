@@ -46,34 +46,8 @@ define(function (require, exports, module) {
     var $tomcatManager = false;
 
 
-    // Look for the menu where we will be inserting our theme menu
-    var menu = Menus.addMenu("Tomcat", "tomcatManager", Menus.BEFORE, Menus.AppMenuBar.HELP_MENU);
-
-
-    var commands = {
-        "configure": {
-            id: "tomcat.Configure",
-            name: "Manager",
-            exec: function() {
-                toggle(true);
-            }
-        }
-    };
-
-
     // Load styling
     ExtensionUtils.loadStyleSheet(module, "tmpl/tomcatManager.css");
-
-
-    for ( var iCmd in commands ) {
-        if ( commands.hasOwnProperty(iCmd) === false ) {
-            continue;
-        }
-
-        var command = commands[iCmd];
-        CommandManager.register(command.name, command.id, command.exec);
-        menu.addMenuItem(command.id);
-    }
 
 
     configurations.ready(function() {
@@ -83,14 +57,10 @@ define(function (require, exports, module) {
             $consoleMessages  = $consoleContainer.find(".messages");
 
         $actionsContainer.on("click", ".start", function(evt) {
-            if ( _server ) {
-                tomcat.start(_server).done(instanceManager);
-            }
+            start(_server);
         })
         .on("click", ".stop", function(evt) {
-            if ( _server._instance ) {
-                tomcat.stop(_server._instance);
-            }
+            stop(_server);
         })
         .on("click", ".clear", function(evt) {
             $consoleMessages.empty();
@@ -101,9 +71,24 @@ define(function (require, exports, module) {
         });
 
 
+        function start( server ) {
+            if ( server ) {
+                $.when(stop( server )).then(function() {
+                    return tomcat.start(server).done(instanceManager);
+                });
+            }
+        }
+
+
+        function stop( server ) {
+            if ( server && server._instance ) {
+                return tomcat.stop( server._instance );
+            }
+        }
+
+
         function instanceManager(instance) {
             _server._instance = instance;
-            console.log(_server);
 
             $(instance).on("tomcat.started", function(evt, success, message) {
                 //console.log("tomcat.start", success, message);
@@ -170,6 +155,32 @@ define(function (require, exports, module) {
     }
 
 
+    function registerMenu() {
+        // Look for the menu where we will be inserting our theme menu
+        var menu = Menus.addMenu("Tomcat", "tomcatManager", Menus.BEFORE, Menus.AppMenuBar.HELP_MENU);
+
+        var commands = {
+            "configure": {
+                id: "tomcat.Configure",
+                name: "Manager",
+                exec: function() {
+                    toggle(true);
+                }
+            }
+        };
+
+        for ( var iCmd in commands ) {
+            if ( commands.hasOwnProperty(iCmd) === false ) {
+                continue;
+            }
+
+            var command = commands[iCmd];
+            CommandManager.register(command.name, command.id, command.exec);
+            menu.addMenuItem(command.id);
+        }
+    }
+
+
     AppInit.htmlReady(function () {
         $tomcatManager = $(tmpl.tomcatManager);
         $tomcatManager.on("click", ".close", function (evt) {
@@ -177,6 +188,7 @@ define(function (require, exports, module) {
         });
 
         PanelManager.createBottomPanel("tomcat.results", $tomcatManager, 100);
+        registerMenu();
     });
 
 });
