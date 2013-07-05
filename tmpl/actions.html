@@ -1,11 +1,9 @@
-<div>
-    <select class="serverList">
-    {{#getServers}}
-        <option value="{{name}}">{{name}}</option>
-    {{/getServers}}
-    </select>
+<select class="serverList">
+{{#getServers}}
+    <option value="{{name}}">{{name}}</option>
+{{/getServers}}
+</select>
 
-    <button class="start">Start</button>
-    <button class="stop">Stop</button>
-    <button class="clear">Clear</button>
-</div>
+<button class="start"></button>
+<button class="stop"></button>
+<button class="clear">Clear</button>

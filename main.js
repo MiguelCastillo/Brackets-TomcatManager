@@ -73,9 +73,7 @@ define(function (require, exports, module) {
 
         function start( server ) {
             if ( server ) {
-                $.when(stop( server )).then(function() {
-                    return tomcat.start(server).done(instanceManager);
-                });
+                return tomcat.start(server).done(instanceManager);
             }
         }
 
@@ -91,11 +89,11 @@ define(function (require, exports, module) {
             _server._instance = instance;
 
             $(instance).on("tomcat.started", function(evt, success, message) {
-                //console.log("tomcat.start", success, message);
+                console.log("tomcat.start", success, message);
             });
 
             $(instance).on("tomcat.stopped", function(evt, success, message) {
-                //console.log("tomcat.stopped", success, message);
+                console.log("tomcat.stopped", success, message);
             });
 
             $(instance).on("tomcat.message", function(evt, message) {
