@@ -53,10 +53,9 @@ define(function (require, exports, module) {
     var commands = {
         "configure": {
             id: "tomcat.Configure",
-            name: "Configure",
+            name: "Manager",
             exec: function() {
-                // Open dialog to configure tomcat
-                console.log(commands.configure);
+                toggle(true);
             }
         }
     };
@@ -76,28 +75,35 @@ define(function (require, exports, module) {
         menu.addMenuItem(command.id);
     }
 
-    menu.addMenuDivider();
 
+    configurations.ready(function() {
+        var _server = null,
+            $actionsContainer = $tomcatManager.find(".actionsContainer"),
+            $consoleContainer = $tomcatManager.find(".consoleContainer").append($(tmpl.console)),
+            $consoleMessages  = $consoleContainer.find(".messages");
 
-
-    function setCurrentServer(server) {
-        var $console = $(tmpl.console).appendTo($tomcatManager.find(".consoleContainer").empty());
-        var $actions = $(tmpl.actions).appendTo($tomcatManager.find(".actionsContainer").empty());
-        var _instance = false;
-
-        $actions.on("click", ".start", function(evt) {
-            tomcat.start(server).done(instanceManager);
+        $actionsContainer.on("click", ".start", function(evt) {
+            if ( _server ) {
+                tomcat.start(_server).done(instanceManager);
+            }
         })
         .on("click", ".stop", function(evt) {
-            tomcat.stop(_instance);
+            if ( _server._instance ) {
+                tomcat.stop(_server._instance);
+            }
         })
         .on("click", ".clear", function(evt) {
-            $console.find(".messages").empty();
+            $consoleMessages.empty();
+        })
+        .change("select.serverList", function(evt) {
+            var val = $(this).find("select.serverList option:selected").attr("value");
+            _server = configurations.getServerDetails(val);
         });
 
 
         function instanceManager(instance) {
-            _instance = instance;
+            _server._instance = instance;
+            console.log(_server);
 
             $(instance).on("tomcat.started", function(evt, success, message) {
                 //console.log("tomcat.start", success, message);
@@ -109,38 +115,18 @@ define(function (require, exports, module) {
 
             $(instance).on("tomcat.message", function(evt, message) {
                 var messageHtml = Mustache.render(tmpl.consoleMessage, message);
-                $console.find(".messages").append($(messageHtml));
+                $consoleMessages.append($(messageHtml));
             });
         }
-    }
 
 
-    function unregisterServer(server) {
-        menu.removeMenuItem(server.name);
-        //CommandManager.get(config.id);
-    }
-
-
-    function registerServer(server) {
-        // Register tomcat items as menu items so that clicking on one
-        // of them can trigger starting it up and opening up the console
-        // for it.
-        CommandManager.register(server.name, server.name, function() {
-            if ( !this.getChecked() ) {
-                this.setChecked(true);
-                toggle(true);
-                setCurrentServer(server);
+        function init(server) {
+            if ( !_server ) {
+                _server = server;
             }
-            else {
-                this.setChecked(false);
-            }
-        });
-
-        menu.addMenuItem(server.name);
-    }
+        }
 
 
-    configurations.ready(function() {
         function iterate( config, callback ) {
             var servers = config.Servers;
             for ( var iServer in servers ) {
@@ -148,17 +134,22 @@ define(function (require, exports, module) {
                     continue;
                 }
 
-                var server = configurations.getServerDetails(iServer);
-                callback(server, config);
+                callback(configurations.getServerDetails(iServer));
             }
         }
 
-        $(configurations).on("load", function(event, configs) {
-            iterate(configs, registerServer);
+
+        $(configurations).on("load", function(event, config) {
+            _server = null;
+            iterate(config, init);
+
+            var actionsHtml = Mustache.render(tmpl.actions, configurations);
+            $(actionsHtml).appendTo($actionsContainer.empty());
         });
 
-        $(configurations).on("unload", function(event, configs) {
-            iterate(configs, unregisterServer);
+
+        $(configurations).on("unload", function(event, config) {
+            //iterate(config, uninit);
         });
     });
 
@@ -180,11 +171,12 @@ define(function (require, exports, module) {
 
 
     AppInit.htmlReady(function () {
-        PanelManager.createBottomPanel("tomcat.results", $(tmpl.tomcatManager), 100);
-        $tomcatManager = $("#tomcatManager");
+        $tomcatManager = $(tmpl.tomcatManager);
         $tomcatManager.on("click", ".close", function (evt) {
             toggle();
         });
+
+        PanelManager.createBottomPanel("tomcat.results", $tomcatManager, 100);
     });
 
 });

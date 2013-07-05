@@ -18,6 +18,11 @@
     left: 0px;
 }
 
+.tomcatManager .serverList {
+    height: 22px;
+    margin-bottom: 0px;
+}
+
 .tomcatManager .consoleContainer {
     height: 100%;
     overflow: auto;

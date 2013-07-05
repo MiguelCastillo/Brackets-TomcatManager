@@ -79,6 +79,21 @@ define(function(require, exports, module) {
     };
 
 
+    ConfigurationManager.getServers = function() {
+        var result = [];
+        var servers = (configurations.Servers || {});
+        for ( var iServer in servers ) {
+            if ( !servers.hasOwnProperty(iServer) ) {
+                continue;
+            }
+
+            result.push(ConfigurationManager.getServerDetails(iServer));
+        }
+
+        return result;
+    };
+
+
     ConfigurationManager.getServerDetails = function( serverName ) {
         var server = (configurations.Servers || {})[serverName];
         var appServers = configurations.AppServers || {};

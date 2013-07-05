@@ -119,7 +119,7 @@
     function cmdStop( instance ) {
         var child;
 
-        child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: instance.settings.AppServer.path, env: process.env});
+        child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: instance.AppServer.path, env: process.env});
 
         child.stderr.on("data", function(data) {
             var message = parseMessage(data);

@@ -50,10 +50,9 @@ define(function(require, exports, module) {
 
     function start( settings ) {
         function success(result) {
-            var instance = {
-                pid: result.pid,
-                settings: settings
-            };
+            var instance = $.extend({
+                pid: result.pid
+            }, settings);
 
             instances[result.pid] = instance;
             return instance;
