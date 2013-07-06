@@ -57,10 +57,10 @@ define(function (require, exports, module) {
             $consoleMessages  = $consoleContainer.find(".messages");
 
         $actionsContainer.on("click", ".start", function(evt) {
-            start(_server);
+            start();
         })
         .on("click", ".stop", function(evt) {
-            stop(_server);
+            stop();
         })
         .on("click", ".clear", function(evt) {
             $consoleMessages.empty();
@@ -71,16 +71,16 @@ define(function (require, exports, module) {
         });
 
 
-        function start( server ) {
-            if ( server ) {
-                return tomcat.start(server).done(instanceManager);
+        function start() {
+            if ( _server ) {
+                return tomcat.start(_server).done(instanceManager);
             }
         }
 
 
-        function stop( server ) {
-            if ( server && server._instance ) {
-                return tomcat.stop( server._instance );
+        function stop( ) {
+            if ( _server && _server._instance ) {
+                return tomcat.stop( _server._instance );
             }
         }
 
