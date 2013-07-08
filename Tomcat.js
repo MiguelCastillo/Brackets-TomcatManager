@@ -34,17 +34,30 @@ define(function(require, exports, module) {
         _connection = connection;
 
         $(_connection).on("tomcat.started", function (evt, pid, success, data) {
-            $(instances[pid]).trigger("tomcat.started", [success, data]);
+            console.log("started");
+            var instance = getRegisteredInstance(instances[pid]);
+            $(instance).trigger("tomcat.started", [success, data]);
         });
 
-        $(_connection).on("tomcat.stopped", function (evt, pid, success, data) {
-            $(instances[pid]).trigger("tomcat.stopped", [success, data]);
-            delete instances[pid];
+        $(_connection).on("tomcat.stopped", function (evt, pid, success) {
+            if ( !instances[pid] ) {
+                return;
+            }
+
+            var instance = getRegisteredInstance(instances[pid]);
+
+            if ( instance.status === "stopping" ) {
+                $(instance).trigger("tomcat.stopped", [true]);
+            }
+
+            $(instance).trigger("tomcat.exited", [instance.status === "stopping"]);
+            instance.status = "stopped";
+            deleteRegisteredInstance(instance);
         });
 
         $(_connection).on("tomcat.message", function (evt, pid, data) {
-            //console.log("Message", pid, data);
-            $(instances[pid]).trigger("tomcat.message", [data]);
+            var instance = getRegisteredInstance(instances[pid]);
+            $(instance).trigger("tomcat.message", [data]);
         });
     }
 
@@ -55,7 +68,8 @@ define(function(require, exports, module) {
                 pid: result.pid
             }, server);
 
-            instances[result.pid] = instance;
+            registerInstance(instance);
+            instance.status = "running";
             return instance;
         }
 
@@ -64,6 +78,15 @@ define(function(require, exports, module) {
 
 
     function stop( instance ) {
+        instance = getRegisteredInstance(instance);
+
+        if ( !instance.pid ) {
+            console.log("Warning", "Stopping an instance that's not registered");
+        }
+        else {
+            instance.status = "stopping";
+        }
+
         return _connection.domains.tomcat.stop( instance );
     }
 
@@ -76,6 +99,25 @@ define(function(require, exports, module) {
             .done(function (result) {
                 console.log(result);
             });
+    }
+
+
+    function registerInstance(instance) {
+        instances[instance.pid] = instance;
+        return instance;
+    }
+
+
+    function getRegisteredInstance(instance) {
+        instance = instance || {};
+        instance = instances[instance.pid] || {};
+        return instance;
+    }
+
+
+    function deleteRegisteredInstance(instance) {
+        instance = getRegisteredInstance(instance);
+        delete instances[instance.pid];
     }
 
 

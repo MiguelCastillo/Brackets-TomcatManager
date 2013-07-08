@@ -106,6 +106,10 @@
             _domainManager.emitEvent("tomcat", "message", [child.pid, message]);
         });
 
+        child.on("exit", function(code) {
+            _domainManager.emitEvent("tomcat", "stopped", [child.pid, code]);
+        });
+
         return {
             pid: child.pid
         };
@@ -129,6 +133,10 @@
         child.stdout.on("data", function(data) {
             var message = parseMessage(data);
             _domainManager.emitEvent("tomcat", "message", [instance.pid, true, message]);
+        });
+
+        child.on("exit", function(code) {
+            _domainManager.emitEvent("tomcat", "stopped", [instance.pid, code]);
         });
 
         return true;

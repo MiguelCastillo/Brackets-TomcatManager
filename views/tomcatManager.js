@@ -79,12 +79,14 @@ define( function(require, exports, module) {
 
         $(instance).on("tomcat.started", function(evt, success, message) {
             widget.removeClass("state-starting").addClass("state-running");
+            widget.find(".start:disabled").attr("disabled", null);
             console.log("tomcat.start", success, message);
         });
 
-        $(instance).on("tomcat.stopped", function(evt, success, message) {
+        $(instance).on("tomcat.exited", function(evt, success) {
             widget.removeClass("state-stopping");
-            console.log("tomcat.stopped", success, message);
+            widget.find(".stop:disabled").attr("disabled", null);
+            console.log("tomcat.stopped", success);
         });
 
         $(instance).on("tomcat.message", function(evt, message) {
@@ -111,6 +113,7 @@ define( function(require, exports, module) {
     function start(widget) {
         var _self = widget;
         if ( _server ) {
+            _self.find(".start").attr("disabled", "disabled");
             _self.addClass("state-starting");
             return tomcat.start(_server).done(function(instance) {
                 instanceManager(instance, _self);
@@ -122,6 +125,7 @@ define( function(require, exports, module) {
     function stop(widget) {
         var _self = widget;
         if ( _server && _server._instance ) {
+            _self.find(".stop").attr("disabled", "disabled");
             _self.addClass("state-stopping");
             return tomcat.stop( _server._instance );
         }

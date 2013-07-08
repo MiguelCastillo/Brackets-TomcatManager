@@ -37,9 +37,16 @@
     opacity: .8;
 }
 
-.tomcatManager .actionsContainer button:active {
+.tomcatManager .actionsContainer button[]:active {
     background-color: grey;
 }
+
+.tomcatManager .actionsContainer button:disabled {
+    opacity: .3;
+    background-color: transparent;
+    cursor: default;
+}
+
 
 .tomcatManager .actionsContainer .button {
     background-color: transparent;
