@@ -33,109 +33,13 @@ define(function (require, exports, module) {
         PanelManager    = brackets.getModule("view/PanelManager"),
         Resizer         = brackets.getModule("utils/Resizer");
 
-    var tomcat           = require("Tomcat"),
-        configurations   = require("ConfigurationManager");
+    var $tomcatManager  = null;
 
-    var tmpl = {
-        tomcatManager: require("text!tmpl/tomcatManager.html"),
-        console: require("text!tmpl/console.html"),
-        consoleMessage: require("text!tmpl/consoleMessage.html"),
-        actions: require("text!tmpl/actions.html")
-    };
+    // Load up styling
+    ExtensionUtils.loadStyleSheet(module, "views/tomcatManager.css");
 
-    var $tomcatManager = false;
-
-
-    // Load styling
-    ExtensionUtils.loadStyleSheet(module, "tmpl/tomcatManager.css");
-
-
-    configurations.ready(function() {
-        var _server = null,
-            $actionsContainer = $tomcatManager.find(".actionsContainer"),
-            $consoleContainer = $tomcatManager.find(".consoleContainer").append($(tmpl.console)),
-            $consoleMessages  = $consoleContainer.find(".messages");
-
-        $actionsContainer.on("click", ".start", function(evt) {
-            start();
-        })
-        .on("click", ".stop", function(evt) {
-            stop();
-        })
-        .on("click", ".clear", function(evt) {
-            $consoleMessages.empty();
-        })
-        .change("select.serverList", function(evt) {
-            var val = $(this).find("select.serverList option:selected").attr("value");
-            _server = configurations.getServerDetails(val);
-        });
-
-
-        function start() {
-            if ( _server ) {
-                return tomcat.start(_server).done(instanceManager);
-            }
-        }
-
-
-        function stop( ) {
-            if ( _server && _server._instance ) {
-                return tomcat.stop( _server._instance );
-            }
-        }
-
-
-        function instanceManager(instance) {
-            _server._instance = instance;
-
-            $(instance).on("tomcat.started", function(evt, success, message) {
-                console.log("tomcat.start", success, message);
-            });
-
-            $(instance).on("tomcat.stopped", function(evt, success, message) {
-                console.log("tomcat.stopped", success, message);
-            });
-
-            $(instance).on("tomcat.message", function(evt, message) {
-                var messageHtml = Mustache.render(tmpl.consoleMessage, message);
-                $consoleMessages.append($(messageHtml));
-            });
-        }
-
-
-        function init(server) {
-            if ( !_server ) {
-                _server = server;
-            }
-        }
-
-
-        function iterate( config, callback ) {
-            var servers = config.Servers;
-            for ( var iServer in servers ) {
-                if ( servers.hasOwnProperty(iServer) === false ) {
-                    continue;
-                }
-
-                callback(configurations.getServerDetails(iServer));
-            }
-        }
-
-
-        $(configurations).on("load", function(event, config) {
-            _server = null;
-            iterate(config, init);
-
-            var actionsHtml = Mustache.render(tmpl.actions, configurations);
-            $(actionsHtml).appendTo($actionsContainer.empty());
-        });
-
-
-        $(configurations).on("unload", function(event, config) {
-            //iterate(config, uninit);
-        });
-    });
-
+    // Load up tomcatManager widget
+    require("views/tomcatManager");
 
     function toggle(open) {
         if ( open === undefined ) {
@@ -180,7 +84,7 @@ define(function (require, exports, module) {
 
 
     AppInit.htmlReady(function () {
-        $tomcatManager = $(tmpl.tomcatManager);
+        $tomcatManager = $("<div id='tomcatManager' class='bottom-panel vert-resizable top-resizer'>").tomcatManager();
         $tomcatManager.on("click", ".close", function (evt) {
             toggle();
         });
