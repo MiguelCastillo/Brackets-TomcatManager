@@ -3,6 +3,7 @@ Brackets-TomcatManager
 
 Start and stop tomcat servers and view in the tomcat manager console messages from the tomcat instance.
 <br>
+* Only MacOs has been tested.  I am expecting that *Nix based Os will work that have sh.
 
 
 TODO:
