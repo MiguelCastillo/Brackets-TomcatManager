@@ -40,6 +40,7 @@ define(function(require, exports, module) {
         });
 
         $(_connection).on("tomcat.stopped", function (evt, pid, success) {
+            console.log("stopped", instances[pid]);
             if ( !instances[pid] ) {
                 return;
             }

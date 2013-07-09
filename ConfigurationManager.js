@@ -95,7 +95,7 @@ define(function(require, exports, module) {
 
 
     ConfigurationManager.getServerDetails = function( serverName ) {
-        var server = (configurations.Servers || {})[serverName];
+        var server = (configurations.Servers || {})[serverName] || false;
         var appServers = configurations.AppServers || {};
 
         if ( appServers.hasOwnProperty(server.AppServer) ) {

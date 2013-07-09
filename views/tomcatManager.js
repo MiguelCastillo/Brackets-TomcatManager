@@ -37,17 +37,13 @@ define( function(require, exports, module) {
     };
 
 
+    // States a server can be in:
+    // ready, starting, running, stopping
+
     var _server = null, $tomcatManager = null;
 
 
     configurations.ready(function() {
-        function init(server) {
-            if ( !_server ) {
-                _server = server;
-            }
-        }
-
-
         function iterate( config, callback ) {
             var servers = config.Servers;
             for ( var iServer in servers ) {
@@ -62,9 +58,10 @@ define( function(require, exports, module) {
 
         $(configurations).on("load", function(event, config) {
             _server = null;
-            iterate(config, init);
-            var actionsHtml = Mustache.render(tmpl.actions, configurations);
-            $(actionsHtml).appendTo($tomcatManager.find(".actionsContainer").empty());
+            var $actionsHtml = $(Mustache.render(tmpl.actions, configurations));
+            $actionsHtml.appendTo($tomcatManager.find(".actionsContainer").empty());
+            $actionsHtml.children("select.serverList option").eq(0).attr("selected", "selected");
+            selectServer($tomcatManager);
         });
 
 
@@ -76,22 +73,27 @@ define( function(require, exports, module) {
 
     function instanceManager(instance, widget) {
         _server._instance = instance;
+        var $consoleContainer = widget.find(".consoleContainer"),
+            $consoleMessages = $consoleContainer.find(".messages");
 
         $(instance).on("tomcat.started", function(evt, success, message) {
             widget.removeClass("state-starting").addClass("state-running");
-            widget.find(".start:disabled").attr("disabled", null);
-            console.log("tomcat.start", success, message);
+            widget.find(".stop:disabled").attr("disabled", null);
+            widget.find(".start").attr("disabled", "disabled");
+            _server.status = "running";
         });
 
         $(instance).on("tomcat.exited", function(evt, success) {
             widget.removeClass("state-stopping");
-            widget.find(".stop:disabled").attr("disabled", null);
-            console.log("tomcat.stopped", success);
+            widget.find(".start:disabled").attr("disabled", null);
+            widget.find(".stop").attr("disabled", "disabled");
+            _server.status = "ready";
         });
 
         $(instance).on("tomcat.message", function(evt, message) {
             var messageHtml = Mustache.render(tmpl.consoleMessage, message);
-            widget.find(".messages").append($(messageHtml));
+            $consoleMessages.append($(messageHtml));
+            $consoleContainer.scrollTop($consoleMessages.height());
         });
     }
 
@@ -113,6 +115,7 @@ define( function(require, exports, module) {
     function start(widget) {
         var _self = widget;
         if ( _server ) {
+            _server.status = "starting";
             _self.find(".start").attr("disabled", "disabled");
             _self.addClass("state-starting");
             return tomcat.start(_server).done(function(instance) {
@@ -125,6 +128,7 @@ define( function(require, exports, module) {
     function stop(widget) {
         var _self = widget;
         if ( _server && _server._instance ) {
+            _server.status = "stopping";
             _self.find(".stop").attr("disabled", "disabled");
             _self.addClass("state-stopping");
             return tomcat.stop( _server._instance );
@@ -142,6 +146,29 @@ define( function(require, exports, module) {
         var _self = widget;
         var val = _self.find(".actionsContainer select.serverList option:selected").attr("value");
         _server = configurations.getServerDetails(val);
+
+        //
+        // Figure out what to do with the action buttons...  This is based on
+        // the state of the selected server.
+        //
+
+        if ( !_server ) {
+            _self.find(".start, .stop").attr("disabled", "disabled");
+        }
+        else {
+            switch( _server.status ) {
+                case "starting":
+                case "running":
+                    _self.find(".start").attr("disabled", "disabled");
+                    break;
+                case "ready":
+                case "stopping":
+                    _self.find(".stop").attr("disabled", "disabled");
+                    break;
+                default:
+                    _self.find(".stop").attr("disabled", "disabled");
+            }
+        }
     }
 
 
