@@ -11,7 +11,7 @@
     "AppServers": {
         "apache-7.40": {
             "type": "tomcat",
-            "path": "/Users/shibumidev1/Documents/apache-tomcat-7.0.40"
+            "path": "/Users/MiguelCastillo/Documents/apache-tomcat-7.0.40"
         }
     }
 }
