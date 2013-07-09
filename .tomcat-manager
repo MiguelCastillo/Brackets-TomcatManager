@@ -1,0 +1,17 @@
+{
+    "Servers": {
+        "Local Server 1": {
+            "AppServer": "apache-7.40"
+        },
+        "Local Server 2": {
+            "extra-options": "nothing",
+            "AppServer": "apache-7.40"
+        }
+    },
+    "AppServers": {
+        "apache-7.40": {
+            "type": "tomcat",
+            "path": "/Users/shibumidev1/Documents/apache-tomcat-7.0.40"
+        }
+    }
+}
