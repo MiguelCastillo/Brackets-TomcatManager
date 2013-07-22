@@ -1,5 +1,6 @@
 {
     "title": "Tomcat Manager",
+    "name": "tomcat-manager",
     "description": "Manage Tomcat servers in Brackets",
     "version": "0.1.0",
     "author": "Miguel Castillo <mahchagnu@gmail.com>",
