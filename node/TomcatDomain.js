@@ -26,7 +26,7 @@
 (function() {
     "use strict";
 
-    var os = require("os"),
+    var os            = require("os"),
         child_process = require("child_process");
 
     var _domainManager;
@@ -40,8 +40,8 @@
             return "";
         }
 
-        var source = lines.shift();
-        var text   = lines.shift();
+        var source = lines.shift() || '';
+        var text   = lines.shift() || '';
 
         var typeOffset = text.indexOf(":");
         var type       = text.substr(0, typeOffset);
@@ -79,7 +79,12 @@
         var child, starting = true;
 
         // Pass in run so that we can capture stdout and stderr messages
-        child = child_process.spawn("sh", ["./bin/catalina.sh", "run"], {cwd: settings.AppServer.path, env: process.env});
+        if ( os.platform() === "win32" ) {
+            child = child_process.spawn("cmd", ["/c", "bin\\catalina.bat", "run"], {cwd: settings.AppServer.path, env: process.env});
+        }
+        else {
+            child = child_process.spawn("sh", ["./bin/catalina.sh", "run"], {cwd: settings.AppServer.path, env: process.env});
+        }
 
         child.stderr.on("data", function(data) {
             var message = parseMessage(data);
@@ -123,7 +128,12 @@
     function cmdStop( instance ) {
         var child;
 
-        child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: instance.AppServer.path, env: process.env});
+        if ( os.platform() === "win32" ) {
+            child = child_process.spawn("cmd", ["/c", "bin\\catalina.bat", "stop"], {cwd: instance.AppServer.path, env: process.env});
+        }
+        else {
+            child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: instance.AppServer.path, env: process.env});
+        }
 
         child.stderr.on("data", function(data) {
             var message = parseMessage(data);

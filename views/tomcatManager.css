@@ -79,6 +79,7 @@
 
 .tomcatManager .serverList {
     height: 22px;
+    padding: 0px;
     margin-bottom: 0px;
 }
 
