@@ -8,7 +8,6 @@ Start and stop tomcat servers and view in the tomcat manager console messages fr
 
 TODO:
 ======================
-- Support for Window.
 - Save running tomcat instances in .tomcat-manager to keep track of running instances, even after brackets has been closed.
 - Add UI to allow users to configure tomcat instances.
 
