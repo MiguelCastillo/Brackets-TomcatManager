@@ -33,30 +33,51 @@
 
 
     function parseMessage(message) {
-        var lines = ("" + message).split("\n");
-        var length = lines.length;
+        // 1. Look for SEVERE: | INFO:
+        // 2. lastIndexOf('\n') to get the date
+        // 3. Repeat 1.
+        message = ("" + message);
+        var messages = [];
+        
+        while( message ) {
+            var _source   = {};
+            _source.start = 0;
+            _source.end   = message.indexOf('\n'); // Skip \n
+            _source.text  = message.substr(_source.start, _source.end);
+            message       = message.substr(_source.end + 1);
 
-        if (!length) {
-            return "";
+            var _type   = {};
+            _type.start = 0;
+            _type.end   = message.indexOf(": ");
+            _type.name  = message.substr(_type.start, _type.end);
+            message     = message.substr(_type.end + 2);
+
+            //
+            // Figure out if there will be more info after reading the current message.
+            //
+            var _mark1 = message.indexOf("\nSEVERE: "),
+                _mark2 = message.indexOf("\nINFO: ");
+            
+            if ( _mark1 !== -1 || _mark2 !== -1 ) {
+                _mark1 = _mark1 !== -1 && _mark1 < _mark2 ? _mark1 : _mark2;
+                _mark2 = message.lastIndexOf('\n', _mark1 - 1) + 1;
+            }
+            else {
+                _mark2 = message.length;
+            }
+
+
+            messages.push({
+                source: _source.text,
+                type: _type.name,
+                text: message.substr(0, _mark2 - 1) /* - Don't include the last \n */
+            });
+            
+
+            message = message.substr(_mark2);
         }
 
-        var source = lines.shift() || '';
-        var text   = lines.shift() || '';
-
-        var typeOffset = text.indexOf(":");
-        var type       = text.substr(0, typeOffset);
-
-        // Put message together.  The +2 is to skip the : and the extra space in the text.
-        text = text.substr(typeOffset + 2);
-        if ( lines.length ) {
-            text = text + "\n" + lines.join("\n");
-        }
-
-        return {
-            source: source,
-            type: type,
-            text: text
-        };
+        return messages;
     }
 
 
@@ -87,19 +108,23 @@
         }
 
         child.stderr.on("data", function(data) {
-            var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [child.pid, message]);
-
-            if ( starting ) {
-                if ( message.type === "INFO" && message.text.indexOf("Server startup in") === 0 ) {
-                    // trigger startup succesfull
-                    starting = false;
-                    _domainManager.emitEvent("tomcat", "started", [child.pid, true, message]);
-                }
-                else if ( message.type === "SEVERE" ) {
-                    // trigger a failure
-                    starting = false;
-                    _domainManager.emitEvent("tomcat", "started", [child.pid, false, message]);
+            var messages = parseMessage(data), message;
+            
+            for ( var i in messages ) {
+                message = messages[i];
+                _domainManager.emitEvent("tomcat", "message", [child.pid, message]);
+    
+                if ( starting ) {
+                    if ( message.type === "INFO" && message.text.indexOf("Server startup in") === 0 ) {
+                        // trigger startup succesfull
+                        starting = false;
+                        _domainManager.emitEvent("tomcat", "started", [child.pid, true, message]);
+                    }
+                    else if ( message.type === "SEVERE" ) {
+                        // trigger a failure
+                        starting = false;
+                        _domainManager.emitEvent("tomcat", "started", [child.pid, false, message]);
+                    }
                 }
             }
         });
@@ -107,12 +132,16 @@
         child.stdout.on("data", function(data) {
             // Not sure why stdout isn't getting any of the startup messages
             // that aren't errors...
-            var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [child.pid, message]);
+            var messages = parseMessage(data);
+
+            for ( var i in messages ) {
+                _domainManager.emitEvent("tomcat", "message", [child.pid, messages[i]]);
+            }
         });
 
-        child.on("exit", function(code) {
-            _domainManager.emitEvent("tomcat", "stopped", [child.pid, code]);
+        //child.on("exit", function(code, signal) {
+        child.on("close", function(code, signal) {
+            _domainManager.emitEvent("tomcat", "stopped", [child.pid, code, signal]);
         });
 
         return {
@@ -136,13 +165,19 @@
         }
 
         child.stderr.on("data", function(data) {
-            var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [instance.pid, true, message]);
+            var messages = parseMessage(data);
+            
+            for ( var i in messages ) {
+                _domainManager.emitEvent("tomcat", "message", [instance.pid, true, messages[i]]);
+            }
         });
 
         child.stdout.on("data", function(data) {
-            var message = parseMessage(data);
-            _domainManager.emitEvent("tomcat", "message", [instance.pid, true, message]);
+            var messages = parseMessage(data);
+            
+            for ( var i in messages ) {
+                _domainManager.emitEvent("tomcat", "message", [instance.pid, true, messages[i]]);
+            }
         });
 
         child.on("exit", function(code) {
