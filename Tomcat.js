@@ -26,74 +26,88 @@ define(function(require, exports, module) {
     "use strict";
 
     var ExtensionUtils  = brackets.getModule("utils/ExtensionUtils"),
-        NodeConnection  = brackets.getModule("utils/NodeConnection");
+        NodeConnection  = brackets.getModule("utils/NodeConnection"),
+        configurations  = require("ConfigurationManager");
 
-    var _connection = null, instances = {};
+    var _connection = null;
 
     function init(connection) {
         _connection = connection;
 
         $(_connection).on("tomcat.started", function (evt, pid, success, data) {
-            console.log("started");
-            var instance = getRegisteredInstance(instances[pid]);
-            $(instance).trigger("tomcat.started", [success, data]);
+            var server = getRegisteredServer(pid);
+            //console.log("started", pid, server);
+            
+            updateServerStatus(server, "running");
+            $(server).trigger("tomcat.started", [success, data]);
         });
 
         $(_connection).on("tomcat.stopped", function (evt, pid, success) {
-            console.log("stopped", instances[pid]);
-            if ( !instances[pid] ) {
+            var server = getRegisteredServer(pid);
+            //console.log("stopped", pid, server);
+            
+            if ( !server ) {
                 return;
             }
 
-            var instance = getRegisteredInstance(instances[pid]);
-
-            if ( instance.status === "stopping" ) {
-                $(instance).trigger("tomcat.stopped", [true]);
+            var serverStatus = getServerStatus(server);
+            
+            if ( serverStatus === "stopping" ) {
+                $(server).trigger("tomcat.stopped", [true]);
             }
 
-            $(instance).trigger("tomcat.exited", [instance.status === "stopping"]);
-            instance.status = "stopped";
-            deleteRegisteredInstance(instance);
+            $(server).trigger("tomcat.exited", [serverStatus === "stopping"]);
+            deleteRegisteredServer(server);
         });
 
         $(_connection).on("tomcat.message", function (evt, pid, data) {
-            var instance = getRegisteredInstance(instances[pid]);
-            $(instance).trigger("tomcat.message", [data]);
+            var server = getRegisteredServer(pid);
+            //console.log("message", pid, server);
+            $(server).trigger("tomcat.message", [data]);
         });
     }
 
 
     function start( server ) {
-        function success(result) {
-            var instance = $.extend({
-                pid: result.pid
-            }, server);
+        var AppServer = configurations.getAppServer(server);
 
-            registerInstance(instance);
-            instance.status = "running";
-            return instance;
+        // Handle passing in a server name        
+        if ( typeof server === "string" ) {
+            server = configurations.getServer(server);
         }
 
-        return _connection.domains.tomcat.start(server).then(success, success);
+        var settings = $.extend({}, server, {AppServer: AppServer});
+
+        function success(result) {
+            registerServer(server, {
+                status: "starting",
+                pid: result.pid,
+                AppServer: result.AppServer
+            });
+
+            return server;
+        }
+
+        return _connection.domains.tomcat.start( settings ).then(success);
     }
 
 
-    function stop( instance ) {
-        instance = getRegisteredInstance(instance);
+    function stop( server ) {
+        server = getRegisteredServer(server);
 
-        if ( !instance.pid ) {
+        if ( !server._instance.pid ) {
             console.log("Warning", "Stopping an instance that's not registered");
         }
         else {
-            instance.status = "stopping";
+            updateServerStatus(server, "stopping");
         }
 
-        return _connection.domains.tomcat.stop( instance );
+        return _connection.domains.tomcat.stop( server._instance );
     }
 
 
-    function getStatus( instance ) {
-        return _connection.domains.tomcat.getStatus( instance )
+    function getStatus( server ) {
+        return _connection.domains.tomcat.getStatus( server )
             .fail(function (err) {
                 console.error(err);
             })
@@ -103,22 +117,50 @@ define(function(require, exports, module) {
     }
 
 
-    function registerInstance(instance) {
-        instances[instance.pid] = instance;
-        return instance;
+    function getServerStatus(server) {
+        return (server._instance ? server._instance : {}).status;
+    }
+    
+
+    function updateServerStatus(server, status) {
+        server._instance.status = status;
+        configurations.saveConfiguration();
     }
 
 
-    function getRegisteredInstance(instance) {
-        instance = instance || {};
-        instance = instances[instance.pid] || {};
-        return instance;
+    function getRegisteredServer(server) {
+        var pid = -1;
+
+        if ( typeof server === "number" || typeof server === "string" ) {
+            pid = server;
+        }
+        else if ( typeof server === "object" && server._instance ) {
+            pid = server._instance.pid;
+        }
+
+        if ( pid !== -1 ) {
+            var servers = configurations.getServers();
+            for (var iServer in servers) {
+                if ( servers[iServer]._instance && servers[iServer]._instance.pid == pid) {
+                    return servers[iServer];
+                }
+            }
+        }
+        
+        return false;
     }
 
 
-    function deleteRegisteredInstance(instance) {
-        instance = getRegisteredInstance(instance);
-        delete instances[instance.pid];
+    function registerServer(server, instance) {
+        server._instance = instance;
+        configurations.saveConfiguration();
+        return server;
+    }
+
+
+    function deleteRegisteredServer(server) {
+        delete server._instance;
+        configurations.saveConfiguration();
     }
 
 

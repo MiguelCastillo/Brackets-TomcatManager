@@ -40,99 +40,70 @@ define( function(require, exports, module) {
     // States a server can be in:
     // ready, starting, running, stopping
 
-    var _server = null, $tomcatManager = null;
+    var _selectedServer = null, _currentRegistration = null;
 
 
-    configurations.ready(function() {
-        function iterate( config, callback ) {
-            var servers = config.Servers;
-            for ( var iServer in servers ) {
-                if ( servers.hasOwnProperty(iServer) === false ) {
-                    continue;
-                }
-
-                callback(configurations.getServerDetails(iServer));
-            }
-        }
-
-
-        $(configurations).on("load", function(event, config) {
-            _server = null;
-            var $actionsHtml = $(Mustache.render(tmpl.actions, configurations));
-            $actionsHtml.appendTo($tomcatManager.find(".actionsContainer").empty());
-            $actionsHtml.children("select.serverList option").eq(0).attr("selected", "selected");
-            selectServer($tomcatManager);
-        });
-
-
-        $(configurations).on("unload", function(event, config) {
-            //iterate(config, uninit);
-        });
-    });
-
-
-    function instanceManager(instance, widget) {
-        _server._instance = instance;
+    function registerServer(server, widget) {
         var $consoleContainer = widget.find(".consoleContainer"),
             $consoleMessages = $consoleContainer.find(".messages");
-
-        $(instance).on("tomcat.started", function(evt, success, message) {
+        
+        function onStarted(evt, success, message) {
             widget.removeClass("state-starting").addClass("state-running");
             widget.find(".stop:disabled").attr("disabled", null);
             widget.find(".start").attr("disabled", "disabled");
-            _server.status = "running";
-        });
+        }
 
-        $(instance).on("tomcat.exited", function(evt, success) {
+        function onExited(evt, success) {
             widget.removeClass("state-stopping");
-            widget.find(".start:disabled").attr("disabled", null);
+            widget.find(".start").attr("disabled", null);
             widget.find(".stop").attr("disabled", "disabled");
-            _server.status = "ready";
-        });
-
-        $(instance).on("tomcat.message", function(evt, message) {
+            
+            // Unregister event handlers
+            unregister();
+        }
+        
+        function onMessage(evt, message) {
             var messageHtml = Mustache.render(tmpl.consoleMessage, message);
             $consoleMessages.append($(messageHtml));
-            $consoleContainer.scrollTop($consoleMessages.height());
-        });
-    }
+            setTimeout( function() {
+                $consoleContainer.scrollTop($consoleMessages.height());
+            }, 300);
+        }
+        
+        
+        function unregister() {
+            $(server).off("tomcat.started", onStarted);
+            $(server).off("tomcat.exited", onExited);
+            $(server).off("tomcat.message", onMessage);
+        }
 
-
-
-    function init(widget) {
-        var _self = widget.addClass("tomcatManager");
-        _self.html($(tmpl.tomcatManager));
-        _self.find(".consoleContainer").append($(tmpl.console));
-
-        _self.on("click.tomcatManager", ".start", function() {start(widget);})
-        .on("click.tomcatManager", ".stop", function() {stop(widget);})
-        .on("click.tomcatManager", ".clearConsole", function() {clearConsole(widget);})
-        .change("select.serverList", function() {selectServer(widget);});
-        return _self;
+        $(server).on("tomcat.started", onStarted);
+        $(server).on("tomcat.exited", onExited);
+        $(server).on("tomcat.message", onMessage);
+        
+        return {
+            unregister: unregister  
+        };
     }
 
 
     function start(widget) {
         var _self = widget;
-        if ( _server ) {
-            _server.status = "starting";
-            _self.find(".start").attr("disabled", "disabled");
-            _self.addClass("state-starting");
-            return tomcat.start(_server).done(function(instance) {
-                instanceManager(instance, _self);
-            });
-        }
+        _self.find(".start").attr("disabled", "disabled");
+        _self.addClass("state-starting");
+        var server = configurations.getServer(_selectedServer);
+        return tomcat.start(server).done(function() {
+            _currentRegistration = registerServer(server, _self);
+        });
     }
 
 
     function stop(widget) {
         var _self = widget;
-        if ( _server && _server._instance ) {
-            _server.status = "stopping";
-            _self.find(".stop").attr("disabled", "disabled");
-            _self.addClass("state-stopping");
-            return tomcat.stop( _server._instance );
-        }
+        _self.find(".stop").attr("disabled", "disabled");
+        _self.addClass("state-stopping");
+        var server = configurations.getServer(_selectedServer);
+        return tomcat.stop( server );
     }
 
 
@@ -143,46 +114,81 @@ define( function(require, exports, module) {
 
 
     function selectServer(widget) {
-        var _self = widget;
-        var val = _self.find(".actionsContainer select.serverList option:selected").attr("value");
-        _server = configurations.getServerDetails(val);
+        var _self  = widget;
+        var val    = _self.find(".actionsContainer select.serverList option:selected").attr("value");
+        var server = configurations.getServer(val);
+        
+        if ( _currentRegistration ) {
+            _currentRegistration.unregister();
+            _currentRegistration = null;
+        }
+        
+        _selectedServer = val;
 
         //
         // Figure out what to do with the action buttons...  This is based on
         // the state of the selected server.
         //
 
-        if ( !_server ) {
+        if ( !server ) {
             _self.find(".start, .stop").attr("disabled", "disabled");
         }
         else {
-            switch( _server.status ) {
+            if ( server._instance ) {
+                _currentRegistration = registerServer(server, _self);
+            }
+
+            switch( (server._instance || {}).status ) {
                 case "starting":
                 case "running":
+                    _self.find(".stop").attr("disabled", null);
                     _self.find(".start").attr("disabled", "disabled");
                     break;
-                case "ready":
-                case "stopping":
-                    _self.find(".stop").attr("disabled", "disabled");
-                    break;
+                // Everything else will enable the start button and disable the stop button.
+                //case "ready":
+                //case "stopping":
                 default:
                     _self.find(".stop").attr("disabled", "disabled");
+                    _self.find(".start").attr("disabled", null);
             }
         }
+    }
+
+
+    function initWidget(widget) {
+        var _self = widget.addClass("tomcatManager");
+        _self.html($(tmpl.tomcatManager));
+        _self.find(".consoleContainer").append($(tmpl.console));
+
+        _self.on("click.tomcatManager", ".start", function() {start(widget);})
+            .on("click.tomcatManager", ".stop", function() {stop(widget);})
+            .on("click.tomcatManager", ".clearConsole", function() {clearConsole(widget);})
+            .change("select.serverList", function() {selectServer(widget);});
+
+        $(configurations).on("load", function(event, config) {
+            _selectedServer = null;
+            var $actionsHtml = $(Mustache.render(tmpl.actions, configurations));
+            $actionsHtml.appendTo(widget.find(".actionsContainer").empty());
+            $actionsHtml.children("select.serverList option").eq(0).attr("selected", "selected");
+            selectServer(widget);
+        });
+
+        return _self;
     }
 
 
     $.fn.tomcatManager = function( options ) {
         var _widget = this;
 
-        if ( $tomcatManager ) {
-            return $tomcatManager;
-        }
-
-        $tomcatManager = _widget;
         return _widget.each(function() {
             var $this = $(this);
-            init.apply($this, [$this, options]);
+            
+            if ( $this.data("tomcatManager") ) {
+                return $this;
+            }
+            
+            initWidget.apply($this, [$this, options]);
+            return $this.data("tomcatManager", true);
         });
     };
 

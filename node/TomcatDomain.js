@@ -32,6 +32,86 @@
     var _domainManager;
 
 
+    /**
+     * @private
+     * Handler function for the simple.getMemory command.
+     * @return {{total: number, free: number}} The total and free amount of
+     *   memory on the user's system, in bytes.
+     */
+    function cmdGetMemory() {
+        return {total: os.totalmem(), free: os.freemem()};
+    }
+
+
+    /**
+    * @private
+    * Starts a new tomcat instance with the provided settings
+    */
+    function cmdStart( settings ) {
+        var child;
+
+        // Pass in run so that we can capture stdout and stderr messages
+        if ( os.platform() === "win32" ) {
+            child = child_process.spawn("cmd", ["/c", "bin\\catalina.bat", "run"], {cwd: settings.AppServer.path, env: process.env});
+        }
+        else {
+            child = child_process.spawn("sh", ["./bin/catalina.sh", "run"], {cwd: settings.AppServer.path, env: process.env});
+        }
+
+        registerServer(child);
+
+        // Instance that needs to be used when shutting it down
+        return {
+            pid: child.pid,
+            AppServer: settings.AppServer
+        };
+    }
+
+
+    /**
+    * @private
+    * Stops the currently running tomcat instance
+    */
+    function cmdStop( instance ) {
+        var child;
+
+        if ( os.platform() === "win32" ) {
+            child = child_process.spawn("cmd", ["/c", "bin\\catalina.bat", "stop"], {cwd: instance.AppServer.path, env: process.env});
+        }
+        else {
+            child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: instance.AppServer.path, env: process.env});
+        }
+
+        child.stderr.on("data", function(data) {
+            var messages = parseMessage(data);
+            
+            for ( var i in messages ) {
+                _domainManager.emitEvent("tomcat", "message", [instance.pid, true, messages[i]]);
+            }
+        });
+
+        child.stdout.on("data", function(data) {
+            var messages = parseMessage(data);
+            
+            for ( var i in messages ) {
+                _domainManager.emitEvent("tomcat", "message", [instance.pid, true, messages[i]]);
+            }
+        });
+
+        return true;
+    }
+
+
+    /**
+    * @private
+    * Checks the status of a running instance of tomcat
+    * @return Details about the running instance
+    */
+    function cmdGetStatus( ) {
+        return {};
+    }
+
+
     function parseMessage(message) {
         // 1. Look for SEVERE: | INFO:
         // 2. lastIndexOf('\n') to get the date
@@ -81,120 +161,44 @@
     }
 
 
-    /**
-     * @private
-     * Handler function for the simple.getMemory command.
-     * @return {{total: number, free: number}} The total and free amount of
-     *   memory on the user's system, in bytes.
-     */
-    function cmdGetMemory() {
-        return {total: os.totalmem(), free: os.freemem()};
-    }
-
-
-    /**
-    * @private
-    * Starts a new tomcat instance with the provided settings
-    */
-    function cmdStart( settings ) {
-        var child, starting = true;
-
-        // Pass in run so that we can capture stdout and stderr messages
-        if ( os.platform() === "win32" ) {
-            child = child_process.spawn("cmd", ["/c", "bin\\catalina.bat", "run"], {cwd: settings.AppServer.path, env: process.env});
-        }
-        else {
-            child = child_process.spawn("sh", ["./bin/catalina.sh", "run"], {cwd: settings.AppServer.path, env: process.env});
-        }
-
-        child.stderr.on("data", function(data) {
+    function registerServer(server) {
+        var starting = true;
+        
+        server.stderr.on("data", function(data) {
             var messages = parseMessage(data), message;
             
             for ( var i in messages ) {
                 message = messages[i];
-                _domainManager.emitEvent("tomcat", "message", [child.pid, message]);
+                _domainManager.emitEvent("tomcat", "message", [server.pid, message]);
     
                 if ( starting ) {
                     if ( message.type === "INFO" && message.text.indexOf("Server startup in") === 0 ) {
                         // trigger startup succesfull
                         starting = false;
-                        _domainManager.emitEvent("tomcat", "started", [child.pid, true, message]);
+                        _domainManager.emitEvent("tomcat", "started", [server.pid, true, message]);
                     }
                     else if ( message.type === "SEVERE" ) {
                         // trigger a failure
                         starting = false;
-                        _domainManager.emitEvent("tomcat", "started", [child.pid, false, message]);
+                        _domainManager.emitEvent("tomcat", "started", [server.pid, false, message]);
                     }
                 }
             }
         });
 
-        child.stdout.on("data", function(data) {
+        server.stdout.on("data", function(data) {
             // Not sure why stdout isn't getting any of the startup messages
             // that aren't errors...
             var messages = parseMessage(data);
 
             for ( var i in messages ) {
-                _domainManager.emitEvent("tomcat", "message", [child.pid, messages[i]]);
+                _domainManager.emitEvent("tomcat", "message", [server.pid, messages[i]]);
             }
         });
 
-        //child.on("exit", function(code, signal) {
-        child.on("close", function(code, signal) {
-            _domainManager.emitEvent("tomcat", "stopped", [child.pid, code, signal]);
-        });
-
-        return {
-            pid: child.pid
-        };
-    }
-
-
-    /**
-    * @private
-    * Stops the currently running tomcat instance
-    */
-    function cmdStop( instance ) {
-        var child;
-
-        if ( os.platform() === "win32" ) {
-            child = child_process.spawn("cmd", ["/c", "bin\\catalina.bat", "stop"], {cwd: instance.AppServer.path, env: process.env});
-        }
-        else {
-            child = child_process.spawn("sh", ["./bin/catalina.sh", "stop"], {cwd: instance.AppServer.path, env: process.env});
-        }
-
-        child.stderr.on("data", function(data) {
-            var messages = parseMessage(data);
-            
-            for ( var i in messages ) {
-                _domainManager.emitEvent("tomcat", "message", [instance.pid, true, messages[i]]);
-            }
-        });
-
-        child.stdout.on("data", function(data) {
-            var messages = parseMessage(data);
-            
-            for ( var i in messages ) {
-                _domainManager.emitEvent("tomcat", "message", [instance.pid, true, messages[i]]);
-            }
-        });
-
-        child.on("exit", function(code) {
-            _domainManager.emitEvent("tomcat", "stopped", [instance.pid, code]);
-        });
-
-        return true;
-    }
-
-
-    /**
-    * @private
-    * Checks the status of a running instance of tomcat
-    * @return Details about the running instance
-    */
-    function cmdGetStatus( ) {
-        return {};
+        server.on("close", function(code, signal) {
+            _domainManager.emitEvent("tomcat", "stopped", [server.pid, code, signal]);
+        });        
     }
 
 
@@ -252,6 +256,7 @@
             "tomcat",
             "message"
         );
+        
     }
 
     exports.init = init;

@@ -26,24 +26,24 @@ define(function(require, exports, module) {
     "use strict";
 
     var ProjectFiles = require('ProjectFiles');
-    var ConfigurationManager = {}, configurations = {}, _ready = $.Deferred();
+    var ConfigurationManager = {},
+        configuration = {};
 
 
     function projectOpenDone( config ) {
-        configurations = JSON.parse(config);
-        $(ConfigurationManager).trigger("load", [configurations]);
+        configuration = JSON.parse(config);
+        $(ConfigurationManager).trigger("load", [configuration]);
     }
 
     function projectOpenFailed() {
-        configurations = {};
-        $(ConfigurationManager).trigger("load", [configurations]);
+        configuration = {};
+        $(ConfigurationManager).trigger("load", [configuration]);
     }
 
 
     // Project settings for tomcat
     $(ProjectFiles).on("projectOpen", function() {
-        _ready.resolve(ConfigurationManager);
-        $(ConfigurationManager).trigger("unload", [configurations]);
+        $(ConfigurationManager).trigger("unload", [configuration]);
 
         ProjectFiles.openFile( ".tomcat-manager" )
             .done(function( fileReader ) {
@@ -55,59 +55,66 @@ define(function(require, exports, module) {
     });
 
 
-    ConfigurationManager.ready = _ready.promise().done;
-
-
-    ConfigurationManager.getConfigurations = function( ) {
-        return configurations;
+    ConfigurationManager.getConfiguration = function( ) {
+        return configuration;
     };
 
 
-    ConfigurationManager.addAppServer = function ( appServer ) {
+    ConfigurationManager.saveConfiguration = function() {
+        ProjectFiles.openFile( ".tomcat-manager", "write", true )
+            .done(function( fileWriter ) {
+                fileWriter.write( JSON.stringify( configuration ) );
+            })
+            .fail(projectOpenFailed);
     };
 
 
-    ConfigurationManager.removeAppServer = function ( appServer ) {
-    };
-
-
-    ConfigurationManager.addServer = function( server ) {
-    };
-
-
-    ConfigurationManager.removeSever = function( server ) {
-    };
-
-
-    ConfigurationManager.getServers = function() {
+    ConfigurationManager.getServersAsArray = function() {
         var result = [];
-        var servers = (configurations.Servers || {});
+        var servers = (configuration.Servers || {});
         for ( var iServer in servers ) {
             if ( !servers.hasOwnProperty(iServer) ) {
                 continue;
             }
 
-            result.push(ConfigurationManager.getServerDetails(iServer));
+            result.push(ConfigurationManager.getServer(iServer));
         }
 
         return result;
     };
+    
+    
+    ConfigurationManager.getServers = function() {
+        return (configuration.Servers || {});
+    };
+
+
+    ConfigurationManager.getAppServer = function( server ) {
+        if ( typeof server === "string" ) {
+            server = ConfigurationManager.getServer(server);
+        }
+
+        var appServers = configuration.AppServers || {};
+        return appServers[server.AppServer];
+    };
+    
+    
+    ConfigurationManager.getServer = function( serverName ) {
+        var server = (configuration.Servers || {})[serverName] || false;
+        if (server) {
+            server.name = serverName;
+        }
+        return server;
+    };
 
 
     ConfigurationManager.getServerDetails = function( serverName ) {
-        var server = (configurations.Servers || {})[serverName] || false;
-        var appServers = configurations.AppServers || {};
-
-        if ( appServers.hasOwnProperty(server.AppServer) ) {
-            var appServer = $.extend({
-                "name": server.AppServer
-            }, appServers[server.AppServer]);
-            return $.extend({name: serverName}, server, {"AppServer": appServer});
-        }
-
-        return server;
+        var server = ConfigurationManager.getServer(serverName);
+        var appServer = ConfigurationManager.getAppServer(server);
+        return $.extend({}, server, {"AppServer": appServer});
     };
 
 
     return ConfigurationManager;
 });
+

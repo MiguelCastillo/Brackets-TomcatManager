@@ -37,7 +37,7 @@
     opacity: .8;
 }
 
-.tomcatManager .actionsContainer button[]:active {
+.tomcatManager .actionsContainer button:active {
     background-color: grey;
 }
 
