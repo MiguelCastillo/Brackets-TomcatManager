@@ -46,10 +46,10 @@ define(function(require, exports, module) {
         $(ConfigurationManager).trigger("unload", [configuration]);
 
         ProjectFiles.openFile( ".tomcat-manager" )
-            .done(function( fileReader ) {
-                fileReader.readAsText()
-                .done(projectOpenDone)
-                .fail(projectOpenFailed);
+            .done(function( file ) {
+                file.read()
+                    .done(projectOpenDone)
+                    .fail(projectOpenFailed);
             })
             .fail(projectOpenFailed);
     });
@@ -82,8 +82,8 @@ define(function(require, exports, module) {
 
         return result;
     };
-    
-    
+
+
     ConfigurationManager.getServers = function() {
         return (configuration.Servers || {});
     };
@@ -97,8 +97,8 @@ define(function(require, exports, module) {
         var appServers = configuration.AppServers || {};
         return appServers[server.AppServer];
     };
-    
-    
+
+
     ConfigurationManager.getServer = function( serverName ) {
         var server = (configuration.Servers || {})[serverName] || false;
         if (server) {
