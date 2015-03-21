@@ -3,7 +3,7 @@
     "name": "tomcat-manager",
     "description": "Manage Tomcat servers in Brackets",
     "version": "0.1.5",
-    "author": "Miguel Castillo <mahchagnu@gmail.com>",
+    "author": "Miguel Castillo <manchagnu@gmail.com>",
     "homepage": "https://github.com/MiguelCastillo/Brackets-Tomcat-Manager",
     "repository": {
         "type": "git",
